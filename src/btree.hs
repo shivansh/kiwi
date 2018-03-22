@@ -7,7 +7,7 @@ data Tree a = Tree
 
 data Node a = Node
     { keyCount :: Int -- number of keys currently stored
-    , degree   :: Int -- degree of a node
+    , degree :: Int -- degree of a node
     , isLeaf :: Bool -- indicates if the node is leaf
     , keys :: [a]
     , child :: [Node a]
@@ -15,10 +15,7 @@ data Node a = Node
 
 -- findKey returns the index of key in a list
 findKey :: (Eq a) => a -> [a] -> Int
-findKey x xs =
-    case elemIndex x xs of
-        Just p -> p
-        Nothing -> -1
+findKey x xs = fromMaybe (-1) (elemIndex x xs)
 
 -- search returns the index of the key if it exists in BTree and -1 otherwise.
 search :: (Eq a) => Node a -> a -> Int
@@ -46,7 +43,7 @@ splitChild x i = do
             , keys = take (degree x - 2) (keys y)
             , child = take (degree x - 1) (child y)
             }
-    if not isLeaf y
+    if not (isLeaf y)
         then do
             let c1 = drop (degree x) (child y)
             let z =
@@ -113,7 +110,7 @@ insert t k = do
 -- isLeafList checks whether the given list contains leaf nodes.
 isLeafList :: [Node a] -> Bool
 isLeafList x
-    | not(null x) = isLeaf $ head x
+    | not (null x) = isLeaf $ head x
     | otherwise = True
 
 -- insertNonFull inserts an element into a node having less than 2*t-1 elements.
