@@ -35,11 +35,13 @@ func Search(x *Node, k int) int {
 	}
 }
 
+// SplitChild splits the i'th child of a Node into two segments, and the middle
+// element of the child is inserted at the i'th index in the Node. The
+// partitioning is done such that the left and the right segments can contain
+// atmost t-1 elements.
 func SplitChild(x *Node, i int) {
-	// y is the left segment and z is the right segment, both containing
-	// atmost t-1 elements.
-	y := x.child[i]
-	z := &Node{x.t - 1, x.t, y.leaf, []int{}, []*Node{}}
+	y := x.child[i]                                      // left segment
+	z := &Node{x.t - 1, x.t, y.leaf, []int{}, []*Node{}} // right segment
 	for j := 0; j < x.t-1; j++ {
 		z.keys = append(z.keys, y.keys[j+x.t])
 	}
@@ -50,15 +52,28 @@ func SplitChild(x *Node, i int) {
 		}
 	}
 	y.n = x.t - 1
-	x.keys = append(x.keys, 0) // increase size by one
+	c := &Node{0, x.t, IsLeaf(x.child), []int{}, []*Node{}}
+	x.child = append(x.child, c) // increment size by one
+	for j := len(x.child) - 1; j > i+1; j-- {
+		x.child[j] = x.child[j-1]
+	}
+	x.child[i+1] = z
+	x.keys = append(x.keys, 0) // increment size by one
+	// Insert the middle element of the child Node into x at i'th index.
 	for j := x.n - 1; j >= i; j-- {
 		x.keys[j+1] = x.keys[j]
 	}
-	x.keys[i] = y.keys[x.t]
+	x.keys[i] = y.keys[x.t-1]
 	x.n = x.n + 1
-	y.keys = y.keys[:x.t]
+	// Update the left segment, making it i'th child of x.
+	y.keys = y.keys[:x.t-1]
+	if x.t < len(y.child) {
+		y.child = y.child[:x.t]
+	}
+	x.child[i] = y
 }
 
+// Insert inserts the key k into the BTree.
 func Insert(T *Tree, k int) {
 	x := T.root
 	if x.n == 2*x.t-1 {
@@ -71,10 +86,11 @@ func Insert(T *Tree, k int) {
 	}
 }
 
+// InsertNonFull inserts an element into a node having less than 2*t-1 elements.
 func InsertNonFull(x *Node, k int) {
 	i := x.n - 1
 	if x.leaf {
-		x.keys = append(x.keys, 0) // increase size by one
+		x.keys = append(x.keys, 0) // increment size by one
 		for ; i >= 0 && k < x.keys[i]; i-- {
 			x.keys[i+1] = x.keys[i]
 		}
@@ -84,33 +100,17 @@ func InsertNonFull(x *Node, k int) {
 		for ; i >= 0 && k < x.keys[i]; i-- {
 		}
 		i++
-		// Allocate space for **to-be** inserted child elements.
-		l := len(x.child) - i
-		if l <= 0 {
-			c := &Node{0, x.t, IsLeaf(x.child), []int{}, []*Node{}}
-			for j := 0; j < l+1; j++ {
-				x.child = append(x.child, c)
-			}
-		}
 		if x.child[i].n == 2*x.t-1 {
 			SplitChild(x, i)
 			if k > x.keys[i] {
 				i++
 			}
 		}
-		// Allocate space for **to-be** inserted child elements.
-		l = len(x.child) - i
-		if l <= 0 {
-			c := &Node{0, x.t, IsLeaf(x.child), []int{}, []*Node{}}
-			for j := 0; j < l+1; j++ {
-				x.child = append(x.child, c)
-			}
-		}
 		InsertNonFull(x.child[i], k)
 	}
 }
 
-// IsLeaf checks if the child container contains leaf nodes.
+// IsLeaf checks if the given container contains leaf nodes.
 func IsLeaf(x []*Node) bool {
 	if len(x) > 0 {
 		return x[0].leaf
@@ -132,8 +132,17 @@ func Traverse(x *Node, level int) {
 	}
 }
 
+// InOrder does an inorder traversal of the BTree.
 func InOrder(x *Node) {
-
+	for k, v := range x.keys {
+		if !x.leaf {
+			InOrder(x.child[k])
+		}
+		fmt.Printf("%d, ", v)
+	}
+	if !x.leaf {
+		InOrder(x.child[x.n])
+	}
 }
 
 func main() {
