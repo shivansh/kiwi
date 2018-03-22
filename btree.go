@@ -67,6 +67,7 @@ func SplitChild(x *Node, i int) {
 	x.n = x.n + 1
 	// Update the left segment, making it i'th child of x.
 	y.keys = y.keys[:x.t-1]
+	y.n = len(y.keys)
 	if x.t < len(y.child) {
 		y.child = y.child[:x.t]
 	}
