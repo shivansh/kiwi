@@ -39,77 +39,51 @@ search x k
 
 -- splitChild splits the i'th child of a Node into two segments, and the middle
 -- element of the child is inserted at the i'th index in the Node. The
--- partitioning is done such that the left and the right segments can contain
--- atmost (degree - 1) elements.
+-- partitioning is done such that the left and the right segments (y and z
+-- respectively) can contain atmost (degree - 1) elements.
 splitChild :: Node a -> Int -> Node a
-splitChild x i = do
-    let y = child x !! i
-    let k1 = take i (keys x) ++ (keys y !! (degree x - 1)) : drop i (keys x)
-    let y1 =
+splitChild x i =
+    let c = child x !! i
+        k1 = take i (keys x) ++ (keys c !! (degree x - 1)) : drop i (keys x)
+        y =
             Node
             { keyCount = degree x - 1
             , degree = degree x
-            , isLeaf = isLeaf y
-            , keys = take (degree x - 1) (keys y)
-            , child = take (degree x) (child y)
+            , isLeaf = isLeaf c
+            , keys = take (degree x - 1) (keys c)
+            , child = take (degree x) (child c)
             }
-    if not (isLeaf y)
-        then do
-            let z =
-                    Node
-                    { keyCount = degree x - 1
-                    , degree = degree x
-                    , isLeaf = isLeaf y
-                    , keys = drop (degree x) (keys y)
-                    , child = drop (degree x) (child y)
-                    }
-            let c1 = take i (child x) ++ y1 : z : drop i (child x)
-            -- TODO: Hindent wrongly indents when instantiating without `let`.
-            let ret =
-                    Node
-                    { keyCount = keyCount x + 1
-                    , degree = degree x
-                    , isLeaf = isLeaf x
-                    , keys = k1
-                    , child = c1
-                    }
-            ret
-        else do
-            let z =
-                    Node
-                    { keyCount = degree x - 1
-                    , degree = degree x
-                    , isLeaf = isLeaf y
-                    , keys = drop (degree x) (keys y)
-                    , child = []
-                    }
-            let c1 = take i (child x) ++ y1 : z : drop (i + 1) (child x)
-            -- TODO: Hindent wrongly indents when instantiating without `let`.
-            let ret =
-                    Node
-                    { keyCount = keyCount x + 1
-                    , degree = degree x
-                    , isLeaf = isLeaf x
-                    , keys = k1
-                    , child = c1
-                    }
-            ret
+        z =
+            Node
+            { keyCount = degree x - 1
+            , degree = degree x
+            , isLeaf = isLeaf c
+            , keys = drop (degree x) (keys c)
+            , child = drop (degree x) (child c)
+            }
+    in Node
+       { keyCount = keyCount x + 1
+       , degree = degree x
+       , isLeaf = isLeaf x
+       , keys = k1
+       , child =
+             take i (child x) ++ y : z : drop (calcIndex i (isLeaf c)) (child x)
+       }
 
 -- insert inserts a key into the BTree.
 insert :: (Ord a) => Tree a -> a -> Tree a
 insert t k = do
     let x = root t
     if keyCount x == 2 * degree x - 1
-        then do
-            let s =
-                    Node
-                    { keyCount = 0
-                    , degree = degree x
-                    , isLeaf = False
-                    , keys = []
-                    , child = [x]
-                    }
-            Tree {root = insertNonFull (splitChild s 0) k}
+        then let s =
+                     Node
+                     { keyCount = 0
+                     , degree = degree x
+                     , isLeaf = False
+                     , keys = []
+                     , child = [x]
+                     }
+             in Tree {root = insertNonFull (splitChild s 0) k}
         else Tree {root = insertNonFull x k}
 
 -- insertNonFull inserts an element into a node having less than 2*(degree) - 1
@@ -126,29 +100,19 @@ insertNonFull x k = do
              , child = child x
              }
         else if keyCount (child x !! i) == 2 * degree x - 1
-                 then do
-                     let x1 = splitChild x i
-                     if k > (keys x1 !! i)
-                         then Node
-                              { keyCount = keyCount x1
-                              , degree = degree x1
-                              , isLeaf = isLeaf x1
-                              , keys = keys x1
-                              , child =
-                                    take (i + 1) (child x1) ++
-                                    insertNonFull (child x1 !! (i + 1)) k :
-                                    drop (i + 2) (child x1)
-                              }
-                         else Node
-                              { keyCount = keyCount x1
-                              , degree = degree x1
-                              , isLeaf = isLeaf x1
-                              , keys = keys x1
-                              , child =
-                                    take i (child x1) ++
-                                    insertNonFull (child x1 !! i) k :
-                                    drop (i + 1) (child x1)
-                              }
+                 -- Luckily, calcIndex behaves exactly as required here.
+                 then let x1 = splitChild x i
+                          i1 = calcIndex i (k > (keys x1 !! i))
+                      in Node
+                         { keyCount = keyCount x1
+                         , degree = degree x1
+                         , isLeaf = isLeaf x1
+                         , keys = keys x1
+                         , child =
+                               take i1 (child x1) ++
+                               insertNonFull (child x1 !! i1) k :
+                               drop (i1 + 1) (child x1)
+                         }
                  else Node
                       { keyCount = keyCount x
                       , degree = degree x
@@ -159,6 +123,14 @@ insertNonFull x k = do
                             insertNonFull (child x !! i) k :
                             drop (i + 1) (child x)
                       }
+
+-- calcIndex determines the number of elements to be dropped when the creating
+-- right segment, depending on whether the node being splitted is a leaf or not.
+-- This property is also exploited when inserting in a non-full node.
+calcIndex :: Int -> Bool -> Int
+calcIndex i isleaf
+    | not isleaf = i
+    | otherwise = i + 1
 
 insertIndex :: (Ord a) => a -> [a] -> Int -> Int
 insertIndex x xs i
