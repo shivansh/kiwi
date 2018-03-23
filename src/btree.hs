@@ -14,6 +14,15 @@ data Node a = Node
     , child :: [Node a]
     } deriving (Show)
 
+-- create creates a new Tree of a given degree.
+create :: Int -> Tree a
+create d = do
+    let x =
+            Node
+            {keyCount = 0, degree = d, isLeaf = True, keys = [], child = []}
+    let ret = Tree {root = x}
+    ret
+
 -- findKey returns the index of key in a list
 findKey :: (Eq a) => a -> [a] -> Int
 findKey x xs = fromMaybe (-1) (elemIndex x xs)
@@ -34,35 +43,33 @@ search x k
 splitChild :: Node a -> Int -> Node a
 splitChild x i = do
     let y = child x !! i
-    let k1 = drop (degree x) (keys y)
-    let k2 = take i (keys x) ++ keys y !! degree x : drop i (keys x)
+    let x_k = take i (keys x) ++ (keys y !! (degree x - 1)) : drop i (keys x)
     let y1 =
             Node
             { keyCount = degree x - 1
             , degree = degree x
             , isLeaf = isLeaf y
-            , keys = take (degree x - 2) (keys y)
-            , child = take (degree x - 1) (child y)
+            , keys = take (degree x - 1) (keys y) -- TODO: check
+            , child = take (degree x) (child y)
             }
     if not (isLeaf y)
         then do
-            let c1 = drop (degree x) (child y)
             let z =
                     Node
                     { keyCount = degree x - 1
                     , degree = degree x
-                    , isLeaf = isLeaf x
-                    , keys = k1
-                    , child = c1
+                    , isLeaf = isLeaf y
+                    , keys = drop (degree x) (keys y)
+                    , child = drop (degree x) (child y)
                     }
-            let c2 = take (i - 1) (child x) ++ y1 : z : drop i (child x)
+            let c1 = take i (child x) ++ y1 : z : drop i (child x)
             let retNode =
                     Node
                     { keyCount = keyCount x + 1
                     , degree = degree x
                     , isLeaf = isLeaf x
-                    , keys = k2
-                    , child = c2
+                    , keys = x_k
+                    , child = c1
                     }
             retNode
         else do
@@ -70,17 +77,17 @@ splitChild x i = do
                     Node
                     { keyCount = degree x - 1
                     , degree = degree x
-                    , isLeaf = isLeaf x
-                    , keys = k1
+                    , isLeaf = isLeaf y
+                    , keys = drop (degree x) (keys y)
                     , child = []
                     }
-            let c1 = take (i - 1) (child x) ++ y1 : z : drop i (child x)
+            let c1 = take i (child x) ++ y1 : z : drop (i + 1) (child x)
             let retNode =
                     Node
                     { keyCount = keyCount x + 1
                     , degree = degree x
                     , isLeaf = isLeaf x
-                    , keys = k2
+                    , keys = x_k
                     , child = c1
                     }
             retNode
@@ -97,45 +104,40 @@ insert t k = do
                     , degree = degree x
                     , isLeaf = False
                     , keys = []
-                    , child = []
+                    , child = [x]
                     }
-            let tree = Tree {root = insertNonFull (splitChild s 0) 0}
+            let tree = Tree {root = insertNonFull (splitChild s 0) k}
             tree
-        else do
-            let tree = Tree {root = insertNonFull x k}
-            tree
-
--- isLeafList checks whether the given list contains leaf nodes.
-isLeafList :: [Node a] -> Bool
-isLeafList x
-    | not (null x) = isLeaf $ head x
-    | otherwise = True
+        else Tree {root = insertNonFull x k}
 
 -- insertNonFull inserts an element into a node having less than 2*t-1 elements.
 insertNonFull :: (Ord a) => Node a -> a -> Node a
 insertNonFull x k = do
-    let i = keyCount x - 1
+    let i = insertIndex k (keys x) (keyCount x - 1)
     if isLeaf x
-        then do
-            let k1 = take i (keys x) ++ k : drop i (keys x)
-            let ret =
-                    Node
-                    { keyCount = keyCount x + 1
-                    , degree = degree x
-                    , isLeaf = isLeaf x
-                    , keys = k1
-                    , child = child x
-                    }
-            ret
-        else do
-            let i1 = insertIndex k (keys x) i
-            if keyCount (child x !! i1) == 2 * degree x - 1
-                then do
-                    let ret = splitChild x i1
-                    if k > (keys x !! i1)
-                        then insertNonFull (child x !! (i1 + 1)) k
-                        else insertNonFull (child x !! i1) k
-                else insertNonFull (child x !! i1) k
+        then Node
+             { keyCount = keyCount x + 1
+             , degree = degree x
+             , isLeaf = isLeaf x
+             , keys = take i (keys x) ++ k : drop i (keys x)
+             , child = child x
+             }
+        else if keyCount (child x !! i) == 2 * degree x - 1
+                 then do
+                     let x1 = splitChild x i
+                     if k > (keys x1 !! i)
+                         then insertNonFull (child x1 !! (i + 1)) k
+                         else insertNonFull (child x1 !! i) k
+                 else Node
+                      { keyCount = keyCount x
+                      , degree = degree x
+                      , isLeaf = isLeaf x
+                      , keys = keys x
+                      , child =
+                            take i (child x) ++
+                            insertNonFull (child x !! i) k :
+                            drop (i + 1) (child x)
+                      }
 
 insertIndex :: (Ord a) => a -> [a] -> Int -> Int
 insertIndex x xs i
