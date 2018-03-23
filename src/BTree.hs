@@ -1,3 +1,5 @@
+module BTree where
+
 import Data.List
 import Data.Maybe
 
@@ -15,15 +17,14 @@ data Node a = Node
     } deriving (Show)
 
 -- create creates a new Tree of a given degree.
-create :: Int -> Tree a
-create d = do
-    let x =
-            Node
-            {keyCount = 0, degree = d, isLeaf = True, keys = [], child = []}
-    let ret = Tree {root = x}
-    ret
+-- TODO: Support polymorphic types.
+create :: (Num a) => Int -> Tree a
+create d =
+    Tree
+    { root =
+          Node {keyCount = 0, degree = d, isLeaf = True, keys = [], child = []}
+    }
 
--- findKey returns the index of key in a list
 findKey :: (Eq a) => a -> [a] -> Int
 findKey x xs = fromMaybe (-1) (elemIndex x xs)
 
@@ -39,17 +40,17 @@ search x k
 -- splitChild splits the i'th child of a Node into two segments, and the middle
 -- element of the child is inserted at the i'th index in the Node. The
 -- partitioning is done such that the left and the right segments can contain
--- atmost t-1 elements.
+-- atmost (degree - 1) elements.
 splitChild :: Node a -> Int -> Node a
 splitChild x i = do
     let y = child x !! i
-    let x_k = take i (keys x) ++ (keys y !! (degree x - 1)) : drop i (keys x)
+    let k1 = take i (keys x) ++ (keys y !! (degree x - 1)) : drop i (keys x)
     let y1 =
             Node
             { keyCount = degree x - 1
             , degree = degree x
             , isLeaf = isLeaf y
-            , keys = take (degree x - 1) (keys y) -- TODO: check
+            , keys = take (degree x - 1) (keys y)
             , child = take (degree x) (child y)
             }
     if not (isLeaf y)
@@ -63,15 +64,16 @@ splitChild x i = do
                     , child = drop (degree x) (child y)
                     }
             let c1 = take i (child x) ++ y1 : z : drop i (child x)
-            let retNode =
+            -- TODO: Hindent wrongly indents when instantiating without `let`.
+            let ret =
                     Node
                     { keyCount = keyCount x + 1
                     , degree = degree x
                     , isLeaf = isLeaf x
-                    , keys = x_k
+                    , keys = k1
                     , child = c1
                     }
-            retNode
+            ret
         else do
             let z =
                     Node
@@ -82,18 +84,19 @@ splitChild x i = do
                     , child = []
                     }
             let c1 = take i (child x) ++ y1 : z : drop (i + 1) (child x)
-            let retNode =
+            -- TODO: Hindent wrongly indents when instantiating without `let`.
+            let ret =
                     Node
                     { keyCount = keyCount x + 1
                     , degree = degree x
                     , isLeaf = isLeaf x
-                    , keys = x_k
+                    , keys = k1
                     , child = c1
                     }
-            retNode
+            ret
 
 -- insert inserts a key into the BTree.
-insert :: (Num a, Ord a) => Tree a -> a -> Tree a
+insert :: (Ord a) => Tree a -> a -> Tree a
 insert t k = do
     let x = root t
     if keyCount x == 2 * degree x - 1
@@ -106,11 +109,11 @@ insert t k = do
                     , keys = []
                     , child = [x]
                     }
-            let tree = Tree {root = insertNonFull (splitChild s 0) k}
-            tree
+            Tree {root = insertNonFull (splitChild s 0) k}
         else Tree {root = insertNonFull x k}
 
--- insertNonFull inserts an element into a node having less than 2*t-1 elements.
+-- insertNonFull inserts an element into a node having less than 2*(degree) - 1
+-- elements.
 insertNonFull :: (Ord a) => Node a -> a -> Node a
 insertNonFull x k = do
     let i = insertIndex k (keys x) (keyCount x - 1)
