@@ -1,7 +1,6 @@
 module BTree where
 
-import Data.List
-import Data.Maybe
+import Helper
 
 -- https://stackoverflow.com/a/12064372/5107319
 newtype Tree a = Tree
@@ -25,9 +24,6 @@ create d =
           Node {keyCount = 0, degree = d, isLeaf = True, keys = [], child = []}
     }
 
-findKey :: (Eq a) => a -> [a] -> Int
-findKey x xs = fromMaybe (-1) (elemIndex x xs)
-
 -- search returns the index of the key if it exists in BTree and -1 otherwise.
 search :: (Eq a) => Node a -> a -> Int
 search x k
@@ -35,7 +31,7 @@ search x k
     | isLeaf x = -1
     | otherwise = search (child x !! i) k
   where
-    i = findKey k (keys x)
+    i = Helper.findKey k (keys x)
 
 -- splitChild splits the i'th child of a Node into two segments, and the middle
 -- element of the child is inserted at the i'th index in the Node. The
@@ -44,7 +40,7 @@ search x k
 splitChild :: Node a -> Int -> Node a
 splitChild x i =
     let c = child x !! i
-        k1 = take i (keys x) ++ (keys c !! (degree x - 1)) : drop i (keys x)
+        k = take i (keys x) ++ (keys c !! (degree x - 1)) : drop i (keys x)
         y =
             Node
             { keyCount = degree x - 1
@@ -65,9 +61,10 @@ splitChild x i =
        { keyCount = keyCount x + 1
        , degree = degree x
        , isLeaf = isLeaf x
-       , keys = k1
+       , keys = k
        , child =
-             take i (child x) ++ y : z : drop (calcIndex i (isLeaf c)) (child x)
+             take i (child x) ++
+             y : z : drop (Helper.calcIndex i (isLeaf c)) (child x)
        }
 
 -- insert inserts a key into the BTree.
@@ -90,7 +87,7 @@ insert t k = do
 -- elements.
 insertNonFull :: (Ord a) => Node a -> a -> Node a
 insertNonFull x k = do
-    let i = insertIndex k (keys x) (keyCount x - 1)
+    let i = Helper.insertIndex k (keys x) (keyCount x - 1)
     if isLeaf x
         then Node
              { keyCount = keyCount x + 1
@@ -102,7 +99,7 @@ insertNonFull x k = do
         else if keyCount (child x !! i) == 2 * degree x - 1
                  -- Luckily, calcIndex behaves exactly as required here.
                  then let x1 = splitChild x i
-                          i1 = calcIndex i (k > (keys x1 !! i))
+                          i1 = Helper.calcIndex i (k > (keys x1 !! i))
                       in Node
                          { keyCount = keyCount x1
                          , degree = degree x1
@@ -123,16 +120,3 @@ insertNonFull x k = do
                             insertNonFull (child x !! i) k :
                             drop (i + 1) (child x)
                       }
-
--- calcIndex determines the number of elements to be dropped when the creating
--- right segment, depending on whether the node being splitted is a leaf or not.
--- This property is also exploited when inserting in a non-full node.
-calcIndex :: Int -> Bool -> Int
-calcIndex i isleaf
-    | not isleaf = i
-    | otherwise = i + 1
-
-insertIndex :: (Ord a) => a -> [a] -> Int -> Int
-insertIndex x xs i
-    | i >= 0 && x < xs !! i = insertIndex x xs (i - 1)
-    | otherwise = i + 1
