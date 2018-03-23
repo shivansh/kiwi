@@ -85,7 +85,7 @@ splitChild x i = do
             retNode
 
 -- insert inserts a key into the BTree.
-insert :: (Num a) => Tree a -> a -> Tree a
+insert :: (Num a, Ord a) => Tree a -> a -> Tree a
 insert t k = do
     let x = root t
     if keyCount x == 2 * degree x - 1
@@ -98,13 +98,10 @@ insert t k = do
                     , keys = []
                     , child = []
                     }
-            let s1 = splitChild s 0
-            let s2 = insertNonFull s1 0
-            let tree = Tree {root = s2}
+            let tree = Tree {root = insertNonFull (splitChild s 0) 0}
             tree
         else do
-            let s = insertNonFull x k
-            let tree = Tree {root = s}
+            let tree = Tree {root = insertNonFull x k}
             tree
 
 -- isLeafList checks whether the given list contains leaf nodes.
@@ -114,7 +111,7 @@ isLeafList x
     | otherwise = True
 
 -- insertNonFull inserts an element into a node having less than 2*t-1 elements.
-insertNonFull :: Node a -> a -> Node a
+insertNonFull :: (Ord a) => Node a -> a -> Node a
 insertNonFull x k = do
     let i = keyCount x - 1
     if isLeaf x
@@ -130,5 +127,16 @@ insertNonFull x k = do
                     }
             ret
         else do
-            let ret = x
-            ret
+            let i1 = insertIndex k (keys x) i
+            if keyCount (child x !! i1) == 2 * degree x - 1
+                then do
+                    let ret = splitChild x i1
+                    if k > (keys x !! i1)
+                        then insertNonFull (child x !! (i1 + 1)) k
+                        else insertNonFull (child x !! i1) k
+                else insertNonFull (child x !! i1) k
+
+insertIndex :: (Ord a) => a -> [a] -> Int -> Int
+insertIndex x xs i
+    | i >= 0 && x < xs !! i = insertIndex x xs (i - 1)
+    | otherwise = i + 1
