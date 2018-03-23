@@ -126,8 +126,26 @@ insertNonFull x k = do
                  then do
                      let x1 = splitChild x i
                      if k > (keys x1 !! i)
-                         then insertNonFull (child x1 !! (i + 1)) k
-                         else insertNonFull (child x1 !! i) k
+                         then Node
+                              { keyCount = keyCount x1
+                              , degree = degree x1
+                              , isLeaf = isLeaf x1
+                              , keys = keys x1
+                              , child =
+                                    take (i + 1) (child x1) ++
+                                    insertNonFull (child x1 !! (i + 1)) k :
+                                    drop (i + 2) (child x1)
+                              }
+                         else Node
+                              { keyCount = keyCount x1
+                              , degree = degree x1
+                              , isLeaf = isLeaf x1
+                              , keys = keys x1
+                              , child =
+                                    take i (child x1) ++
+                                    insertNonFull (child x1 !! i) k :
+                                    drop (i + 1) (child x1)
+                              }
                  else Node
                       { keyCount = keyCount x
                       , degree = degree x
