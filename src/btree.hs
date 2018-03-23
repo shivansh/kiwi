@@ -1,7 +1,8 @@
 import Data.List
 import Data.Maybe
 
-data Tree a = Tree
+-- https://stackoverflow.com/a/12064372/5107319
+newtype Tree a = Tree
     { root :: Node a
     } deriving (Show)
 
