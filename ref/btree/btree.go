@@ -7,10 +7,11 @@ type Tree struct {
 }
 
 type Node struct {
-	n     int   // number of keys currently stored
-	t     int   // degree of a node
-	leaf  bool  // indicates if the node is leaf
-	keys  []int // TODO: flexible types
+	n int // number of keys currently stored
+
+	t     int  // degree of a node
+	leaf  bool // indicates if the node is leaf
+	keys  []int
 	vals  [][]byte
 	child []*Node
 }
