@@ -11,9 +11,9 @@ type Node struct {
 	t     int  // degree of a node
 	leaf  bool // indicates if the node is a leaf
 	keys  []int
-	vals  [][]byte // only a leaf node will have these
+	vals  [][]byte // only leaf nodes will contain values
 	child []*Node
-	next  *Node // pointer to the next leaf node, if a leaf
+	next  *Node // pointer to the next leaf node (if current node is a leaf)
 }
 
 func Create(degree int) *Tree {
@@ -23,19 +23,27 @@ func Create(degree int) *Tree {
 
 func SplitChild(x *Node, i int) {
 	var next *Node
+	// TODO: A better check of existence. The problem at the moment is that
+	// non-existent children are left unallocated, thus cannot be indexed.
+	// This check is likely to fail when random key insertions are done.
 	if len(x.child) > i+1 {
 		next = x.child[i+1]
 	}
 	y := x.child[i]
 	z := &Node{x.t - 1, x.t, y.leaf, []int{}, [][]byte{}, []*Node{}, next}
-	for j := 0; j < x.t-1; j++ {
-		z.keys, z.vals = append(z.keys, y.keys[j+x.t]), append(z.vals, y.vals[j+x.t])
-	}
 	if !y.leaf {
 		z.child = []*Node{}
 		for j := 0; j < x.t; j++ {
 			z.child = append(z.child, y.child[j+x.t])
 		}
+	} else {
+		// Values are only added at the leaves.
+		for j := 0; j < x.t-1; j++ {
+			z.vals = append(z.vals, y.vals[j+x.t])
+		}
+	}
+	for j := 0; j < x.t-1; j++ {
+		z.keys = append(z.keys, y.keys[j+x.t])
 	}
 	y.n = x.t - 1
 	c := &Node{0, x.t, IsLeaf(x.child), []int{}, [][]byte{}, []*Node{}, nil}
@@ -44,15 +52,18 @@ func SplitChild(x *Node, i int) {
 		x.child[j] = x.child[j-1]
 	}
 	x.child[i+1] = z
-	x.keys, x.vals = append(x.keys, 0), append(x.vals, []byte{})
+	x.keys = append(x.keys, 0) // increment size by one
 	// Insert the middle element of the child Node into x at i'th index.
 	for j := x.n - 1; j >= i; j-- {
-		x.keys[j+1], x.vals[j+1] = x.keys[j], x.vals[j]
+		x.keys[j+1] = x.keys[j]
 	}
-	x.keys[i], x.vals[i] = y.keys[x.t-1], y.vals[x.t-1]
+	x.keys[i] = y.keys[x.t-1]
 	x.n = x.n + 1
 	// Update the left segment, making it i'th child of x.
-	y.keys, y.vals = y.keys[:x.t], y.vals[:x.t]
+	y.keys = y.keys[:x.t]
+	if y.leaf {
+		y.vals = y.vals[:x.t]
+	}
 	y.n = len(y.keys)
 	if x.t < len(y.child) {
 		y.child = y.child[:x.t]
@@ -111,13 +122,15 @@ func IsLeaf(x []*Node) bool {
 // Traverse does a depth-first traversal of the B+ Tree providing a rough sketch
 // of its structure.
 func Traverse(x *Node, level int) {
-	fmt.Printf("level %d\n", level)
+	fmt.Printf("level %d\nkeys: ", level)
 	for k, v := range x.keys {
 		fmt.Printf("{%d: %d}, ", k, v)
 	}
-	fmt.Println()
-	for k, v := range x.vals {
-		fmt.Printf("{%d: %s}, ", k, string(v))
+	fmt.Printf("\nvals: ")
+	if x.leaf {
+		for k, v := range x.vals {
+			fmt.Printf("{%d: %s}, ", k, string(v))
+		}
 	}
 	fmt.Println("\n")
 	for _, v := range x.child {
