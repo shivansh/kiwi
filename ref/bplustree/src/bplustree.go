@@ -1,9 +1,11 @@
-package main
+// An implementation of in-memory operations supported by a B+ Tree.
+package bplustree
 
 import "fmt"
 
 type Tree struct {
-	root *Node
+	Root   *Node
+	dbPath string
 }
 
 type Node struct {
@@ -16,9 +18,10 @@ type Node struct {
 	next  *Node // pointer to the next leaf node (if current node is a leaf)
 }
 
-func Create(degree int) *Tree {
+// Create creates a new B+ Tree of given degree.
+func Create(degree int, dbPath string) *Tree {
 	x := &Node{0, degree, true, []int{}, [][]byte{}, []*Node{}, nil}
-	return &Tree{x}
+	return &Tree{x, dbPath}
 }
 
 func SplitChild(x *Node, i int) {
@@ -73,11 +76,11 @@ func SplitChild(x *Node, i int) {
 }
 
 // Insert inserts the value v corresponding to the key k into the B+ Tree.
-func Insert(T *Tree, k int, v []byte) {
-	x := T.root
+func (t *Tree) Insert(k int, v []byte) {
+	x := t.Root
 	if x.n == 2*x.t-1 {
 		s := &Node{0, x.t, false, []int{}, [][]byte{}, []*Node{x}, nil}
-		T.root = s
+		t.Root = s
 		SplitChild(s, 0)
 		InsertNonFull(s, k, v)
 	} else {
@@ -138,7 +141,7 @@ func Traverse(x *Node, level int) {
 	}
 }
 
-// TraverseLeaves linearly traverses all the leaves starting from the left.
+// TraverseLeaves linearly traverses all the leaves starting from left.
 func TraverseLeaves(x *Node) {
 	if x.leaf {
 		for k, v := range x.keys {
@@ -155,13 +158,4 @@ func TraverseLeaves(x *Node) {
 	} else {
 		TraverseLeaves(x.child[0])
 	}
-}
-
-func main() {
-	t := Create(2)
-	vals := [][]byte{[]byte("hello"), []byte("world")}
-	for i := 0; i < 4; i++ {
-		Insert(t, i, vals[i%2])
-	}
-	Traverse(t.root, 0)
 }

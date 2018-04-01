@@ -7,8 +7,7 @@ type Tree struct {
 }
 
 type Node struct {
-	n int // number of keys currently stored
-
+	n     int  // number of keys currently stored
 	t     int  // degree of a node
 	leaf  bool // indicates if the node is leaf
 	keys  []int
@@ -16,14 +15,15 @@ type Node struct {
 	child []*Node
 }
 
-// Create creates a new Tree of a given degree.
+// Create creates a new BTree of a given degree.
 func Create(degree int) *Tree {
 	x := &Node{0, degree, true, []int{}, [][]byte{}, []*Node{}}
 	t := &Tree{x}
 	return t
 }
 
-// Search returns the index of the key if it exists in BTree and -1 otherwise.
+// Search returns the value corresponding the key k if it exists in BTree and -1
+// otherwise.
 func Search(x *Node, k int) []byte {
 	i := 0
 	for ; i <= x.n && k > x.keys[i]; i++ {
