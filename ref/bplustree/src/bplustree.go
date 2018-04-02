@@ -10,7 +10,7 @@ type Tree struct {
 
 type Node struct {
 	n     int  // number of keys currently stored
-	t     int  // degree of a node
+	t     int  // degree of a node. TODO: Rename to m.
 	leaf  bool // indicates if the node is a leaf
 	keys  []int
 	vals  [][]byte // only leaf nodes will contain values

@@ -80,12 +80,17 @@ func (t *Tree) Search(x *Node, k int) ([]byte, error) {
 		for ; i >= 0 && x.keys[i] >= k; i-- {
 		}
 		i++
-		if x.keys[i] == k {
+		// TODO: A better check of existence.
+		if i < len(x.keys) && x.keys[i] == k {
 			fp, err := os.Open(t.dbPath)
 			if err != nil {
 				return []byte{}, err
 			}
-			vals, err := ReconstructBytesFromFile(fp)
+			b, err := t.GetBlockIndex(k)
+			if err != nil {
+				return []byte{}, err
+			}
+			vals, err := ReconstructBytesFromFile(fp, b)
 			if err != nil {
 				return []byte{}, err
 			}
@@ -104,11 +109,12 @@ func (t *Tree) Search(x *Node, k int) ([]byte, error) {
 
 // ReconstructBytesFromFile reconstructs a slice of byte slices from the B+ Tree
 // file. Each byte slice in the file is preceded by its size.
-func ReconstructBytesFromFile(fp *os.File) ([][]byte, error) {
-	var ret [][]byte
-	// Set offset for reads to the beginning of the file.
-	fp.Seek(0, 0)
-	block := make([]byte, 4096)
+// b is the index of the block which is to be read.
+func ReconstructBytesFromFile(fp *os.File, b int) ([][]byte, error) {
+	ret := [][]byte{}
+	block := make([]byte, blockSize)
+	// Set offset into the file to the beginning of the block.
+	fp.Seek(int64(b)*blockSize, 0)
 	if _, err := fp.Read(block); err != nil {
 		return [][]byte{}, err
 	}
@@ -121,4 +127,17 @@ func ReconstructBytesFromFile(fp *os.File) ([][]byte, error) {
 		i += l + 1
 	}
 	return ret, nil
+}
+
+// GetBlockIndex returns the index of the disk block corresponding to the key k.
+func (t *Tree) GetBlockIndex(k int) (int, error) {
+	m := t.Root.t
+	// A block can have a range of keys given by [m*i, m*i + (m-1)], where m
+	// is the degree of the B+ Tree.
+	for i := 0; k >= m*i || k >= m*i+m-1; i++ {
+		if k >= m*i && k <= m*i+m-1 {
+			return i, nil
+		}
+	}
+	return -1, errors.New("Block does not exist for the given key")
 }
