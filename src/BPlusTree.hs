@@ -1,4 +1,4 @@
-module BTree where
+module BPlusTree where
 
 import Helper
 
@@ -7,13 +7,16 @@ newtype Tree a = Tree
     { root :: Node a
     } deriving (Show)
 
-data Node a = Node
-    { keyCount :: Int -- number of keys currently stored
-    , degree :: Int -- degree of a node
-    , isLeaf :: Bool -- indicates if the node is leaf
-    , keys :: [a]
-    , child :: [Node a]
-    } deriving (Show)
+data Node a
+    = Nil
+    | Node { keyCount :: Int -- number of keys currently stored
+           , degree :: Int -- degree of a node
+           , isLeaf :: Bool -- indicates if the node is leaf
+           , keys :: [a]
+           , child :: [Node a]
+           , next :: Node a -- pointer to next leaf node (if current node is a leaf)
+            }
+    deriving (Show)
 
 -- create creates a new Tree of a given degree.
 -- TODO: Support polymorphic types.
@@ -21,10 +24,17 @@ create :: (Num a) => Int -> Tree a
 create d =
     Tree
     { root =
-          Node {keyCount = 0, degree = d, isLeaf = True, keys = [], child = []}
+          Node
+          { keyCount = 0
+          , degree = d
+          , isLeaf = True
+          , keys = []
+          , child = []
+          , next = Nil
+          }
     }
 
--- search returns the index of the key if it exists in BTree and -1 otherwise.
+-- search returns the index of the key if it exists in BPlusTree and -1 otherwise.
 search :: (Eq a) => Node a -> a -> Int
 search x k
     | i <= keyCount x && k == keys x !! i = 1
@@ -41,14 +51,6 @@ splitChild :: Node a -> Int -> Node a
 splitChild x i =
     let c = child x !! i
         k = take i (keys x) ++ (keys c !! (degree x - 1)) : drop i (keys x)
-        y =
-            Node
-            { keyCount = degree x - 1
-            , degree = degree x
-            , isLeaf = isLeaf c
-            , keys = take (degree x - 1) (keys c)
-            , child = take (degree x) (child c)
-            }
         z =
             Node
             { keyCount = degree x - 1
@@ -56,6 +58,16 @@ splitChild x i =
             , isLeaf = isLeaf c
             , keys = drop (degree x) (keys c)
             , child = drop (degree x) (child c)
+            , next = next c
+            }
+        y =
+            Node
+            { keyCount = degree x
+            , degree = degree x
+            , isLeaf = isLeaf c
+            , keys = take (degree x) (keys c) -- left node includes the middle key
+            , child = take (degree x) (child c)
+            , next = z
             }
     in Node
        { keyCount = keyCount x + 1
@@ -65,9 +77,10 @@ splitChild x i =
        , child =
              take i (child x) ++
              y : z : drop (Helper.calcIndex i (isLeaf c)) (child x)
+       , next = Nil -- parent is no longer a leaf (if it was before)
        }
 
--- insert inserts a key into the BTree.
+-- insert inserts a key into the BPlusTree.
 insert :: (Ord a) => Tree a -> a -> Tree a
 insert t k = do
     let x = root t
@@ -79,12 +92,15 @@ insert t k = do
                      , isLeaf = False
                      , keys = []
                      , child = [x]
+                     , next = Nil
                      }
              in Tree {root = insertNonFull (splitChild s 0) k}
         else Tree {root = insertNonFull x k}
 
 -- insertNonFull inserts an element into a node having less than 2*(degree) - 1
 -- elements.
+-- TODO: When inserting to a leaf, the `next` value of the previous leaf needs to be
+-- updated.
 insertNonFull :: (Ord a) => Node a -> a -> Node a
 insertNonFull x k = do
     let i = Helper.insertIndex k (keys x) (keyCount x - 1)
@@ -95,6 +111,7 @@ insertNonFull x k = do
              , isLeaf = isLeaf x
              , keys = take i (keys x) ++ k : drop i (keys x)
              , child = child x
+             , next = next x
              }
         else if keyCount (child x !! i) == 2 * degree x - 1
                  -- Luckily, calcIndex behaves exactly as required here.
@@ -109,6 +126,7 @@ insertNonFull x k = do
                                take i1 (child x1) ++
                                insertNonFull (child x1 !! i1) k :
                                drop (i1 + 1) (child x1)
+                         , next = next x1
                          }
                  else Node
                       { keyCount = keyCount x
@@ -119,4 +137,14 @@ insertNonFull x k = do
                             take i (child x) ++
                             insertNonFull (child x !! i) k :
                             drop (i + 1) (child x)
+                      , next = next x
                       }
+
+-- traverseLeaves linearly traverses all the leaves starting from left.
+traverseLeaves :: Show a => Node a -> IO ()
+traverseLeaves Nil = putStr ""
+traverseLeaves x
+    | not (isLeaf x) = traverseLeaves $ head (child x)
+    | otherwise = do
+        print $ keys x
+        traverseLeaves $ next x
