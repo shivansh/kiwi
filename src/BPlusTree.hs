@@ -77,10 +77,8 @@ splitChild x i = do
         then do
             leftLeaf <- getLeafFile y
             Disk.syncNode leftLeaf y
-            Disk.syncNode rightLeaf z
-            metaData <- Disk.readMetaData
-            let newMetaData = MetaData $ 1 + leafCount metaData
-            C.writeFile metaFile . C.pack . show $ newMetaData
+            -- The right leaf (z) doesn't need to be synced to disk as it is
+            -- currently empty.
             return ret
         else return ret
 
