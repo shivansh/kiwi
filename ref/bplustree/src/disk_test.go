@@ -11,6 +11,7 @@ func TestTree_Search(t *testing.T) {
 	for k, v := range vals {
 		tree.Insert(k, v)
 	}
+	tree.WriteToDisk()
 
 	type args struct {
 		x *Node
