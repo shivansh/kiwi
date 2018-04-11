@@ -4,23 +4,6 @@ import Helper
 import Leaf
 import Types
 
--- https://stackoverflow.com/a/12064372/5107319
-newtype Tree a = Tree
-    { root :: Node a
-    } deriving (Show)
-
-data Node a
-    = Nil
-    | Node { keyCount :: Int -- number of keys currently stored
-           , degree :: Int -- degree of a node
-           , isLeaf :: Bool -- indicates if the node is leaf
-           , keys :: [Int]
-           , child :: [Node a]
-           , next :: Maybe DBFile -- filename of the next leaf node
-                                -- (if current node is a leaf)
-            }
-    deriving (Show)
-
 -- create creates a new Tree of a given degree.
 -- TODO: Support polymorphic types.
 create :: (Num a) => Int -> Tree a
@@ -68,7 +51,7 @@ splitChild x i =
             { keyCount = degree x + 1
             , degree = degree x
             , isLeaf = isLeaf c
-            , keys = take (degree x + 1) (keys c) -- left node includes middle key
+            , keys = take (degree x + 1) (keys c)
             , child = take (degree x + 1) (child c)
             , next = getLeafFile (keys c !! degree x + 2) (degree x)
             }

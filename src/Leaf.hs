@@ -4,7 +4,7 @@ import Types
 
 -- getLeafIndex returns the index of the leaf corresponding to the given key.
 getLeafIndex :: Int -> Int -> Int
-getLeafIndex key degree = getLeafIndex' key degree 0
+getLeafIndex k m = getLeafIndex' k m 0
   where
     getLeafIndex' k m i
         | k >= m * i && k <= m * i + m - 1 = i
