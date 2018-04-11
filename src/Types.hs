@@ -20,3 +20,7 @@ data Node a
                                   -- (if current node is a leaf)
             }
     deriving (Show, Read)
+
+newtype MetaData = MetaData
+    { leafCount :: Int
+    } deriving (Show, Read)
