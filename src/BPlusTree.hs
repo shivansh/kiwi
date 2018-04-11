@@ -1,6 +1,8 @@
 module BPlusTree where
 
 import Helper
+import Leaf
+import Types
 
 -- https://stackoverflow.com/a/12064372/5107319
 newtype Tree a = Tree
@@ -12,9 +14,10 @@ data Node a
     | Node { keyCount :: Int -- number of keys currently stored
            , degree :: Int -- degree of a node
            , isLeaf :: Bool -- indicates if the node is leaf
-           , keys :: [a]
+           , keys :: [Int]
            , child :: [Node a]
-           , next :: Node a -- pointer to next leaf node (if current node is a leaf)
+           , next :: Maybe DBFile -- filename of the next leaf node
+                                -- (if current node is a leaf)
             }
     deriving (Show)
 
@@ -30,12 +33,12 @@ create d =
           , isLeaf = True
           , keys = []
           , child = []
-          , next = Nil
+          , next = Nothing
           }
     }
 
 -- search returns the index of the key if it exists in BPlusTree and -1 otherwise.
-search :: (Eq a) => Node a -> a -> Int
+search :: (Eq a) => Node a -> Int -> Int
 search x k
     | i <= keyCount x && k == keys x !! i = 1
     | isLeaf x = -1
@@ -47,10 +50,10 @@ search x k
 -- element of the child is inserted at the i'th index in the Node. The
 -- partitioning is done such that the left and the right segments (y and z
 -- respectively) can contain atmost (degree - 1) elements.
-splitChild :: Node a -> Int -> Node a
+splitChild :: (Ord a) => Node a -> Int -> Node a
 splitChild x i =
     let c = child x !! i
-        k = take i (keys x) ++ (keys c !! (degree x - 1)) : drop i (keys x)
+        k = take i (keys x) ++ (keys c !! degree x) : drop i (keys x)
         z =
             Node
             { keyCount = degree x - 2
@@ -67,7 +70,7 @@ splitChild x i =
             , isLeaf = isLeaf c
             , keys = take (degree x + 1) (keys c) -- left node includes middle key
             , child = take (degree x + 1) (child c)
-            , next = z
+            , next = getLeafFile (keys c !! degree x + 2) (degree x)
             }
     in Node
        { keyCount = keyCount x + 1
@@ -77,11 +80,11 @@ splitChild x i =
        , child =
              take i (child x) ++
              y : z : drop (Helper.calcIndex i (isLeaf c)) (child x)
-       , next = Nil -- parent is no longer a leaf (if it was before)
+       , next = Nothing -- parent is no longer a leaf (if it was before)
        }
 
 -- insert inserts a key into the BPlusTree.
-insert :: (Ord a) => Tree a -> a -> Tree a
+insert :: (Ord a) => Tree a -> Int -> Tree a
 insert t k = do
     let x = root t
     if keyCount x == 2 * degree x - 1
@@ -92,16 +95,14 @@ insert t k = do
                      , isLeaf = False
                      , keys = []
                      , child = [x]
-                     , next = Nil
+                     , next = Nothing
                      }
              in Tree {root = insertNonFull (splitChild s 0) k}
         else Tree {root = insertNonFull x k}
 
 -- insertNonFull inserts an element into a node having less than 2*(degree) - 1
 -- elements.
--- TODO: When inserting to a leaf, the `next` value of the previous leaf needs to be
--- updated.
-insertNonFull :: (Ord a) => Node a -> a -> Node a
+insertNonFull :: (Ord a) => Node a -> Int -> Node a
 insertNonFull x k = do
     let i = Helper.insertIndex k (keys x) (keyCount x - 1)
     if isLeaf x
@@ -139,21 +140,3 @@ insertNonFull x k = do
                             drop (i + 1) (child x)
                       , next = next x
                       }
-
--- traverseLeaves linearly traverses all the leaves starting from left.
-traverseLeaves :: Show a => Node a -> IO ()
-traverseLeaves Nil = putStr ""
-traverseLeaves x
-    | not (isLeaf x) = traverseLeaves $ head (child x)
-    | otherwise = do
-        print $ keys x
-        traverseLeaves $ next x
-
--- getLeafIndex returns the index of the leaf corresponding to the key k.
-getLeafIndex :: Tree a -> Int -> Int
-getLeafIndex t k = getLeafIndex' k (degree (root t)) 0
-  where
-    getLeafIndex' k m i
-        | k >= m * i && k <= m * i + m - 1 = i
-        | k >= m * i || k >= m * i + m - 1 = getLeafIndex' k m (i + 1)
-        | otherwise = -1
