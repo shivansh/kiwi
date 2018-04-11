@@ -122,7 +122,7 @@ insertNonFull x k = do
                     , child = child x
                     , next = next x
                     }
-            leafName <- getLeafFile x
+            leafName <- getLeafFile ret
             syncNode leafName ret
             return ret
         else if keyCount (child x !! i) == 2 * degree x - 1

@@ -86,7 +86,7 @@ func (t *Tree) Search(x *Node, k int) ([]byte, error) {
 			if err != nil {
 				return []byte{}, err
 			}
-			b, err := t.GetBlockIndex(k)
+			b, err := t.GetLeafIndex(k)
 			if err != nil {
 				return []byte{}, err
 			}
@@ -113,7 +113,7 @@ func (t *Tree) Search(x *Node, k int) ([]byte, error) {
 func ReconstructBytesFromFile(fp *os.File, b int) ([][]byte, error) {
 	ret := [][]byte{}
 	block := make([]byte, blockSize)
-	// Set offset into the file to the beginning of the block.
+	// Set file offset to point at the beginning of the block.
 	fp.Seek(int64(b)*blockSize, 0)
 	if _, err := fp.Read(block); err != nil {
 		return [][]byte{}, err
@@ -124,20 +124,26 @@ func ReconstructBytesFromFile(fp *os.File, b int) ([][]byte, error) {
 		if len(b) > 0 {
 			ret = append(ret, b)
 		}
-		i += l + 1
+		i += l + 2
 	}
 	return ret, nil
 }
 
-// GetBlockIndex returns the index of the disk block corresponding to the key k.
-func (t *Tree) GetBlockIndex(k int) (int, error) {
+// ReconstructIndexFromFile reconstructs the index into memory from disk.
+// TODO: Figure out how to store index into disk.
+func ReconstructIndexFromFile() {
+
+}
+
+// GetLeafIndex returns the index of the leaf corresponding to the key k.
+func (t *Tree) GetLeafIndex(k int) (int, error) {
 	m := t.Root.t
-	// A block can have a range of keys given by [m*i, m*i + (m-1)], where m
-	// is the degree of the B+ Tree.
-	for i := 0; k >= m*i || k >= m*i+m-1; i++ {
-		if k >= m*i && k <= m*i+m-1 {
+	// The ith leaf can have a range of keys given by
+	// [(2*m-1)*i, (2*m-1)*i + (m-1)], where m is the degree of the B+ Tree.
+	for i := 0; k >= (2*m-1)*i || k >= (2*m-1)*i+m-1; i++ {
+		if k >= (2*m-1)*i && k <= (2*m-1)*i+m-1 {
 			return i, nil
 		}
 	}
-	return -1, errors.New("Block does not exist for the given key")
+	return -1, errors.New("Leaf does not exist for the given key")
 }
