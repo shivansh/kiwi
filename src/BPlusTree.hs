@@ -53,20 +53,20 @@ splitChild x i =
         k = take i (keys x) ++ (keys c !! (degree x - 1)) : drop i (keys x)
         z =
             Node
-            { keyCount = degree x - 1
+            { keyCount = degree x - 2
             , degree = degree x
             , isLeaf = isLeaf c
-            , keys = drop (degree x) (keys c)
-            , child = drop (degree x) (child c)
+            , keys = drop (degree x + 1) (keys c)
+            , child = drop (degree x + 1) (child c)
             , next = next c
             }
         y =
             Node
-            { keyCount = degree x
+            { keyCount = degree x + 1
             , degree = degree x
             , isLeaf = isLeaf c
-            , keys = take (degree x) (keys c) -- left node includes the middle key
-            , child = take (degree x) (child c)
+            , keys = take (degree x + 1) (keys c) -- left node includes middle key
+            , child = take (degree x + 1) (child c)
             , next = z
             }
     in Node
@@ -148,3 +148,12 @@ traverseLeaves x
     | otherwise = do
         print $ keys x
         traverseLeaves $ next x
+
+-- getLeafIndex returns the index of the leaf corresponding to the key k.
+getLeafIndex :: Tree a -> Int -> Int
+getLeafIndex t k = getLeafIndex' k (degree (root t)) 0
+  where
+    getLeafIndex' k m i
+        | k >= m * i && k <= m * i + m - 1 = i
+        | k >= m * i || k >= m * i + m - 1 = getLeafIndex' k m (i + 1)
+        | otherwise = -1
