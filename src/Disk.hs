@@ -20,6 +20,10 @@ readNode leafName = do
     let leaf = read $ C.unpack fileContent
     return leaf
 
+-- syncMetaData updates the B+ Tree metadata on disk.
+syncMetaData :: MetaData -> IO ()
+syncMetaData = C.writeFile metaFile . C.pack . show
+
 -- readMetaData reads the B+ Tree metadata from disk.
 readMetaData :: IO MetaData
 readMetaData = do

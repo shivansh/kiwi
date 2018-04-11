@@ -1,5 +1,7 @@
 module BPlusTree where
 
+import qualified Data.ByteString.Char8 as C
+import Disk
 import Helper
 import Leaf
 import Types
@@ -7,7 +9,9 @@ import Types
 -- create creates a new Tree of a given degree.
 -- TODO: Support polymorphic types.
 create :: (Num a) => Int -> IO (Tree a)
-create d =
+create d = do
+    let newMetaData = MetaData 0
+    C.writeFile metaFile . C.pack . show $ newMetaData
     return
         Tree
         { root =
@@ -47,6 +51,7 @@ splitChild x i = do
             , child = drop (degree x + 1) (child c)
             , next = next c
             }
+    rightLeaf <- genLeafName
     let y =
             Node
             { keyCount = degree x + 1
@@ -54,19 +59,30 @@ splitChild x i = do
             , isLeaf = isLeaf c
             , keys = take (degree x + 1) (keys c)
             , child = take (degree x + 1) (child c)
-            , next = getLeafFile (keys c !! degree x + 2) (degree x)
+            , next = Just rightLeaf
             }
-    return
-        Node
-        { keyCount = keyCount x + 1
-        , degree = degree x
-        , isLeaf = isLeaf x
-        , keys = k
-        , child =
-              take i (child x) ++
-              y : z : drop (Helper.calcIndex i (isLeaf c)) (child x)
-        , next = Nothing -- parent is no longer a leaf (if it was before)
-        }
+    let ret =
+            Node
+            { keyCount = keyCount x + 1
+            , degree = degree x
+            , isLeaf = isLeaf x
+            , keys = k
+            , child =
+                  take i (child x) ++
+                  y : z : drop (Helper.calcIndex i (isLeaf c)) (child x)
+            , next = Nothing -- parent is no longer a leaf (if it was before)
+            }
+    if isLeaf c
+        -- Sync updates to leaves on disk.
+        then do
+            leftLeaf <- getLeafFile y
+            Disk.syncNode leftLeaf y
+            Disk.syncNode rightLeaf z
+            metaData <- Disk.readMetaData
+            let newMetaData = MetaData $ 1 + leafCount metaData
+            C.writeFile metaFile . C.pack . show $ newMetaData
+            return ret
+        else return ret
 
 -- insert inserts a key into the BPlusTree.
 insert :: (Ord a) => Tree a -> Int -> IO (Tree a)
@@ -96,15 +112,19 @@ insertNonFull :: (Ord a) => Node a -> Int -> IO (Node a)
 insertNonFull x k = do
     let i = Helper.insertIndex k (keys x) (keyCount x - 1)
     if isLeaf x
-        then return
-                 Node
-                 { keyCount = keyCount x + 1
-                 , degree = degree x
-                 , isLeaf = isLeaf x
-                 , keys = take i (keys x) ++ k : drop i (keys x)
-                 , child = child x
-                 , next = next x
-                 }
+        then do
+            let ret =
+                    Node
+                    { keyCount = keyCount x + 1
+                    , degree = degree x
+                    , isLeaf = isLeaf x
+                    , keys = take i (keys x) ++ k : drop i (keys x)
+                    , child = child x
+                    , next = next x
+                    }
+            leafName <- getLeafFile x
+            syncNode leafName ret
+            return ret
         else if keyCount (child x !! i) == 2 * degree x - 1
                  then do
                      x1 <- splitChild x i

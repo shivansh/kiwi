@@ -14,12 +14,13 @@ getLeafIndex k1 m1 = getLeafIndex' k1 m1 0
         | otherwise = -1
 
 -- getLeafFile returns the filename of the leaf corresponding to the given key.
-getLeafFile :: Int -> Int -> Maybe DBFile
-getLeafFile k m
-    | t == -1 = Nothing
-    | otherwise = Just $ "l" ++ show t
+getLeafFile :: Node a -> IO DBFile
+getLeafFile x
+    | null (keys x) = return "l0" -- TODO: assuming sequential insertions
+    | t == (-1) = return "" -- TODO: Handle errors
+    | otherwise = return ("l" ++ show t)
   where
-    t = getLeafIndex k m
+    t = getLeafIndex (head (keys x)) (degree x)
 
 -- genLeafName generates a new filename for a leaf depending on the currently
 -- allocated filenames available in B+ Tree metadata.
@@ -27,6 +28,6 @@ genLeafName :: IO String
 genLeafName = do
     metaData <- Disk.readMetaData
     let leafName = "l" ++ show (1 + leafCount metaData)
-    let newMetaData = MetaData $ leafCount metaData
+    let newMetaData = MetaData $ 1 + leafCount metaData
     C.writeFile metaFile . C.pack . show $ newMetaData
     return leafName
