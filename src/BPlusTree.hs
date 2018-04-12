@@ -7,8 +7,7 @@ import Leaf
 import Types
 
 -- create creates a new Tree of a given degree.
--- TODO: Support polymorphic types.
-create :: (Num a) => Int -> IO (Tree a)
+create :: Int -> IO (Tree a)
 create d = do
     let newMetaData = MetaData 0
     C.writeFile metaFile . C.pack . show $ newMetaData
@@ -20,13 +19,14 @@ create d = do
               , degree = d
               , isLeaf = True
               , keys = []
+              , values = []
               , child = []
               , next = Nothing
               }
         }
 
 -- search returns the index of the key if it exists in BPlusTree and -1 otherwise.
-search :: (Eq a) => Node a -> Int -> Int
+search :: Node a -> Int -> Int
 search x k
     | i <= keyCount x && k == keys x !! i = 1
     | isLeaf x = -1
@@ -38,7 +38,7 @@ search x k
 -- element of the child is inserted at the i'th index in the Node. The
 -- partitioning is done such that the left and the right segments (y and z
 -- respectively) can contain atmost (degree - 1) elements.
-splitChild :: (Ord a) => Node a -> Int -> IO (Node a)
+splitChild :: (Show a) => Node a -> Int -> IO (Node a)
 splitChild x i = do
     let c = child x !! i
     let k = take i (keys x) ++ (keys c !! degree x) : drop i (keys x)
@@ -48,6 +48,7 @@ splitChild x i = do
             , degree = degree x
             , isLeaf = isLeaf c
             , keys = drop (degree x + 1) (keys c)
+            , values = drop (degree x + 1) (values c)
             , child = drop (degree x + 1) (child c)
             , next = next c
             }
@@ -58,6 +59,7 @@ splitChild x i = do
             , degree = degree x
             , isLeaf = isLeaf c
             , keys = take (degree x + 1) (keys c)
+            , values = take (degree x + 1) (values c)
             , child = take (degree x + 1) (child c)
             , next = Just rightLeaf
             }
@@ -67,6 +69,7 @@ splitChild x i = do
             , degree = degree x
             , isLeaf = isLeaf x
             , keys = k
+            , values = [] -- parent node is no longer a leaf
             , child =
                   take i (child x) ++
                   y : z : drop (Helper.calcIndex i (isLeaf c)) (child x)
@@ -83,8 +86,8 @@ splitChild x i = do
         else return ret
 
 -- insert inserts a key into the BPlusTree.
-insert :: (Ord a) => Tree a -> Int -> IO (Tree a)
-insert t k = do
+insert :: (Show a) => Tree a -> Int -> a -> IO (Tree a)
+insert t k v = do
     let x = root t
     if keyCount x == 2 * degree x - 1
         then do
@@ -94,20 +97,21 @@ insert t k = do
                     , degree = degree x
                     , isLeaf = False
                     , keys = []
+                    , values = []
                     , child = [x]
                     , next = Nothing
                     }
             updatedChild <- splitChild s 0
-            updatedRoot <- insertNonFull updatedChild k
+            updatedRoot <- insertNonFull updatedChild k v
             return Tree {root = updatedRoot}
         else do
-            updatedRoot <- insertNonFull x k
+            updatedRoot <- insertNonFull x k v
             return Tree {root = updatedRoot}
 
 -- insertNonFull inserts an element into a node having less than 2*(degree) - 1
 -- elements.
-insertNonFull :: (Ord a) => Node a -> Int -> IO (Node a)
-insertNonFull x k = do
+insertNonFull :: (Show a) => Node a -> Int -> a -> IO (Node a)
+insertNonFull x k v = do
     let i = Helper.insertIndex k (keys x) (keyCount x - 1)
     if isLeaf x
         then do
@@ -117,6 +121,7 @@ insertNonFull x k = do
                     , degree = degree x
                     , isLeaf = isLeaf x
                     , keys = take i (keys x) ++ k : drop i (keys x)
+                    , values = take i (values x) ++ v : drop i (values x)
                     , child = child x
                     , next = next x
                     }
@@ -127,26 +132,28 @@ insertNonFull x k = do
                  then do
                      x1 <- splitChild x i
                      let i1 = Helper.calcIndex i (k > (keys x1 !! i))
-                     updatedChild <- insertNonFull (child x1 !! i1) k
+                     updatedChild <- insertNonFull (child x1 !! i1) k v
                      return
                          Node
                          { keyCount = keyCount x1
                          , degree = degree x1
                          , isLeaf = isLeaf x1
                          , keys = keys x1
+                         , values = []
                          , child =
                                take i1 (child x1) ++
                                updatedChild : drop (i1 + 1) (child x1)
                          , next = next x1
                          }
                  else do
-                     updatedChild <- insertNonFull (child x !! i) k
+                     updatedChild <- insertNonFull (child x !! i) k v
                      return
                          Node
                          { keyCount = keyCount x
                          , degree = degree x
                          , isLeaf = isLeaf x
                          , keys = keys x
+                         , values = []
                          , child =
                                take i (child x) ++
                                updatedChild : drop (i + 1) (child x)

@@ -10,11 +10,11 @@ metaFile :: DBFile
 metaFile = "data/metadata"
 
 -- syncNode saves the contents of a node to disk.
-syncNode :: DBFile -> Node a -> IO ()
+syncNode :: (Show a) => DBFile -> Node a -> IO ()
 syncNode leafName = C.writeFile (dbPath ++ leafName) . C.pack . show
 
 -- readNode reads the contents of a node from disk into memory.
-readNode :: DBFile -> IO (Node a)
+readNode :: (Read a) => DBFile -> IO (Node a)
 readNode leafName = do
     fileContent <- C.readFile $ dbPath ++ leafName
     let leaf = read $ C.unpack fileContent
