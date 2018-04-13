@@ -32,23 +32,23 @@ search x k
 -- respectively) can contain atmost (degree - 1) elements.
 splitChild :: (Show a) => Node a -> Int -> IO (Node a)
 splitChild x@Node {} i = do
-    let c = child x !! i
-    let k = take i (keys x) ++ (keys c !! degree x) : drop i (keys x)
-    case c of
-        children@Node {} -> do
-            let z =
-                    Node
-                    { keyCount = degree x - 2
-                    , degree = degree x
-                    , keys = drop (degree x + 1) (keys children)
-                    , child = drop (degree x + 1) (child children)
-                    }
+    let childNode = child x !! i
+    let k = take i (keys x) ++ (keys childNode !! degree x) : drop i (keys x)
+    case childNode of
+        c@Node {} -> do
             let y =
                     Node
                     { keyCount = degree x + 1
                     , degree = degree x
-                    , keys = take (degree x + 1) (keys children)
-                    , child = take (degree x + 1) (child children)
+                    , keys = take (degree x + 1) (keys c)
+                    , child = take (degree x + 1) (child c)
+                    }
+            let z =
+                    Node
+                    { keyCount = degree x - 2
+                    , degree = degree x
+                    , keys = drop (degree x + 1) (keys c)
+                    , child = drop (degree x + 1) (child c)
                     }
             return
                 Node
@@ -59,23 +59,23 @@ splitChild x@Node {} i = do
                       take i (child x) ++
                       y : z : drop (Helper.calcIndex i False) (child x)
                 }
-        children@Leaf {} -> do
-            let z =
-                    Leaf
-                    { keyCount = degree x - 2
-                    , degree = degree x
-                    , keys = drop (degree x + 1) (keys children)
-                    , values = drop (degree x + 1) (values children)
-                    , next = next c
-                    }
+        c@Leaf {} -> do
             rightLeaf <- genLeafName
             let y =
                     Leaf
                     { keyCount = degree x + 1
                     , degree = degree x
-                    , keys = take (degree x + 1) (keys children)
-                    , values = take (degree x + 1) (values children)
+                    , keys = take (degree x + 1) (keys c)
+                    , values = take (degree x + 1) (values c)
                     , next = Just rightLeaf
+                    }
+            let z =
+                    Leaf
+                    { keyCount = degree x - 2
+                    , degree = degree x
+                    , keys = drop (degree x + 1) (keys c)
+                    , values = drop (degree x + 1) (values c)
+                    , next = next c
                     }
             let ret =
                     Node
@@ -92,55 +92,51 @@ splitChild x@Node {} i = do
             -- The right leaf (z) doesn't need to be synced to disk as it is
             -- currently empty.
             return ret
-        Nil -> error "Cannot split Nil type"
-splitChild Leaf {} _ = error "Cannot split Leaf type"
-splitChild Nil _ = error "Cannot split Nil type"
+        Nil -> error "splitChild: cannot split Nil type"
+splitChild Leaf {} _ = error "splitChild: cannot split Leaf type"
+splitChild Nil _ = error "splitChild: cannot split Nil type"
 
 -- insert inserts a key into the BPlusTree.
 insert :: (Show a) => Tree a -> Int -> a -> IO (Tree a)
-insert t k v = do
-    let x = root t
-    if keyCount x == 2 * degree x - 1
-        then do
-            let s =
-                    Node
-                    {keyCount = 0, degree = degree x, keys = [], child = [x]}
-            updatedChild <- splitChild s 0
-            updatedRoot <- insertNonFull updatedChild k v
-            return Tree {root = updatedRoot}
-        else do
-            updatedRoot <- insertNonFull x k v
-            return Tree {root = updatedRoot}
+insert t k v
+    | keyCount x == 2 * degree x - 1 = do
+        let s = Node {keyCount = 0, degree = degree x, keys = [], child = [x]}
+        updatedChild <- splitChild s 0
+        updatedRoot <- insertNonFull updatedChild k v
+        return Tree {root = updatedRoot}
+    | otherwise = do
+        updatedRoot <- insertNonFull x k v
+        return Tree {root = updatedRoot}
+  where
+    x = root t
 
 -- insertNonFull inserts an element into a node having less than 2*(degree) - 1
 -- elements.
 insertNonFull :: (Show a) => Node a -> Int -> a -> IO (Node a)
-insertNonFull x@Node {} k v = do
-    let i = Helper.insertIndex k (keys x) (keyCount x - 1)
-    if keyCount (child x !! i) == 2 * degree x - 1
-        then do
-            x1 <- splitChild x i
-            let i1 = Helper.calcIndex i (k > (keys x1 !! i))
-            updatedChild <- insertNonFull (child x1 !! i1) k v
-            return
-                Node
-                { keyCount = keyCount x1
-                , degree = degree x1
-                , keys = keys x1
-                , child =
-                      take i1 (child x1) ++
-                      updatedChild : drop (i1 + 1) (child x1)
-                }
-        else do
-            updatedChild <- insertNonFull (child x !! i) k v
-            return
-                Node
-                { keyCount = keyCount x
-                , degree = degree x
-                , keys = keys x
-                , child =
-                      take i (child x) ++ updatedChild : drop (i + 1) (child x)
-                }
+insertNonFull x@Node {} k v
+    | keyCount (child x !! i) == 2 * degree x - 1 = do
+        x1 <- splitChild x i
+        let i1 = Helper.calcIndex i (k > (keys x1 !! i))
+        updatedChild <- insertNonFull (child x1 !! i1) k v
+        return
+            Node
+            { keyCount = keyCount x1
+            , degree = degree x1
+            , keys = keys x1
+            , child =
+                  take i1 (child x1) ++ updatedChild : drop (i1 + 1) (child x1)
+            }
+    | otherwise = do
+        updatedChild <- insertNonFull (child x !! i) k v
+        return
+            Node
+            { keyCount = keyCount x
+            , degree = degree x
+            , keys = keys x
+            , child = take i (child x) ++ updatedChild : drop (i + 1) (child x)
+            }
+  where
+    i = Helper.insertIndex k (keys x) (keyCount x - 1)
 insertNonFull x@Leaf {} k v = do
     let i = Helper.insertIndex k (keys x) (keyCount x - 1)
     let ret =
@@ -154,4 +150,4 @@ insertNonFull x@Leaf {} k v = do
     leafName <- getLeafFile ret
     syncNode leafName ret
     return ret
-insertNonFull Nil _ _ = error "Cannot insert in Nil type"
+insertNonFull Nil _ _ = error "insertNonFull: cannot insert in Nil type"

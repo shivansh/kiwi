@@ -10,11 +10,10 @@ newtype Tree a = Tree
     } deriving (Show)
 
 -- TODO: Support polymorphic keys.
--- TODO: Factor out leaves into a separate data constructor
 data Node a
     = Nil
-    | Node { keyCount :: Int -- number of keys currently stored
-           , degree :: Int -- degree of a node
+    | Node { keyCount :: Int
+           , degree :: Int
            , keys :: [Int]
            , child :: [Node a] }
     | Leaf { keyCount :: Int
