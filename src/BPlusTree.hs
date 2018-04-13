@@ -14,22 +14,14 @@ create d = do
     return
         Tree
         { root =
-              Node
-              { keyCount = 0
-              , degree = d
-              , isLeaf = True
-              , keys = []
-              , values = []
-              , child = []
-              , next = Nothing
-              }
+              Leaf
+              {keyCount = 0, degree = d, keys = [], values = [], next = Nothing}
         }
 
 -- search returns the index of the key if it exists in BPlusTree and -1 otherwise.
 search :: Node a -> Int -> Int
 search x k
     | i <= keyCount x && k == keys x !! i = 1
-    | isLeaf x = -1
     | otherwise = search (child x !! i) k
   where
     i = Helper.findKey k (keys x)
@@ -39,51 +31,70 @@ search x k
 -- partitioning is done such that the left and the right segments (y and z
 -- respectively) can contain atmost (degree - 1) elements.
 splitChild :: (Show a) => Node a -> Int -> IO (Node a)
-splitChild x i = do
+splitChild x@Node {} i = do
     let c = child x !! i
     let k = take i (keys x) ++ (keys c !! degree x) : drop i (keys x)
-    let z =
-            Node
-            { keyCount = degree x - 2
-            , degree = degree x
-            , isLeaf = isLeaf c
-            , keys = drop (degree x + 1) (keys c)
-            , values = drop (degree x + 1) (values c)
-            , child = drop (degree x + 1) (child c)
-            , next = next c
-            }
-    rightLeaf <- genLeafName
-    let y =
-            Node
-            { keyCount = degree x + 1
-            , degree = degree x
-            , isLeaf = isLeaf c
-            , keys = take (degree x + 1) (keys c)
-            , values = take (degree x + 1) (values c)
-            , child = take (degree x + 1) (child c)
-            , next = Just rightLeaf
-            }
-    let ret =
-            Node
-            { keyCount = keyCount x + 1
-            , degree = degree x
-            , isLeaf = isLeaf x
-            , keys = k
-            , values = [] -- parent node is no longer a leaf
-            , child =
-                  take i (child x) ++
-                  y : z : drop (Helper.calcIndex i (isLeaf c)) (child x)
-            , next = Nothing -- parent is no longer a leaf (if it was before)
-            }
-    if isLeaf c
-        -- Sync updates to leaves on disk.
-        then do
+    case c of
+        children@Node {} -> do
+            let z =
+                    Node
+                    { keyCount = degree x - 2
+                    , degree = degree x
+                    , keys = drop (degree x + 1) (keys children)
+                    , child = drop (degree x + 1) (child children)
+                    }
+            let y =
+                    Node
+                    { keyCount = degree x + 1
+                    , degree = degree x
+                    , keys = take (degree x + 1) (keys children)
+                    , child = take (degree x + 1) (child children)
+                    }
+            return
+                Node
+                { keyCount = keyCount x + 1
+                , degree = degree x
+                , keys = k
+                , child =
+                      take i (child x) ++
+                      y : z : drop (Helper.calcIndex i False) (child x)
+                }
+        children@Leaf {} -> do
+            let z =
+                    Leaf
+                    { keyCount = degree x - 2
+                    , degree = degree x
+                    , keys = drop (degree x + 1) (keys children)
+                    , values = drop (degree x + 1) (values children)
+                    , next = next c
+                    }
+            rightLeaf <- genLeafName
+            let y =
+                    Leaf
+                    { keyCount = degree x + 1
+                    , degree = degree x
+                    , keys = take (degree x + 1) (keys children)
+                    , values = take (degree x + 1) (values children)
+                    , next = Just rightLeaf
+                    }
+            let ret =
+                    Node
+                    { keyCount = keyCount x + 1
+                    , degree = degree x
+                    , keys = k
+                    , child =
+                          take i (child x) ++
+                          y : z : drop (Helper.calcIndex i True) (child x)
+                    }
+            -- Sync updates to leaves on disk.
             leftLeaf <- getLeafFile y
             Disk.syncNode leftLeaf y
             -- The right leaf (z) doesn't need to be synced to disk as it is
             -- currently empty.
             return ret
-        else return ret
+        Nil -> error "Cannot split Nil type"
+splitChild Leaf {} _ = error "Cannot split Leaf type"
+splitChild Nil _ = error "Cannot split Nil type"
 
 -- insert inserts a key into the BPlusTree.
 insert :: (Show a) => Tree a -> Int -> a -> IO (Tree a)
@@ -93,14 +104,7 @@ insert t k v = do
         then do
             let s =
                     Node
-                    { keyCount = 0
-                    , degree = degree x
-                    , isLeaf = False
-                    , keys = []
-                    , values = []
-                    , child = [x]
-                    , next = Nothing
-                    }
+                    {keyCount = 0, degree = degree x, keys = [], child = [x]}
             updatedChild <- splitChild s 0
             updatedRoot <- insertNonFull updatedChild k v
             return Tree {root = updatedRoot}
@@ -111,51 +115,43 @@ insert t k v = do
 -- insertNonFull inserts an element into a node having less than 2*(degree) - 1
 -- elements.
 insertNonFull :: (Show a) => Node a -> Int -> a -> IO (Node a)
-insertNonFull x k v = do
+insertNonFull x@Node {} k v = do
     let i = Helper.insertIndex k (keys x) (keyCount x - 1)
-    if isLeaf x
+    if keyCount (child x !! i) == 2 * degree x - 1
         then do
-            let ret =
-                    Node
-                    { keyCount = keyCount x + 1
-                    , degree = degree x
-                    , isLeaf = isLeaf x
-                    , keys = take i (keys x) ++ k : drop i (keys x)
-                    , values = take i (values x) ++ v : drop i (values x)
-                    , child = child x
-                    , next = next x
-                    }
-            leafName <- getLeafFile ret
-            syncNode leafName ret
-            return ret
-        else if keyCount (child x !! i) == 2 * degree x - 1
-                 then do
-                     x1 <- splitChild x i
-                     let i1 = Helper.calcIndex i (k > (keys x1 !! i))
-                     updatedChild <- insertNonFull (child x1 !! i1) k v
-                     return
-                         Node
-                         { keyCount = keyCount x1
-                         , degree = degree x1
-                         , isLeaf = isLeaf x1
-                         , keys = keys x1
-                         , values = []
-                         , child =
-                               take i1 (child x1) ++
-                               updatedChild : drop (i1 + 1) (child x1)
-                         , next = next x1
-                         }
-                 else do
-                     updatedChild <- insertNonFull (child x !! i) k v
-                     return
-                         Node
-                         { keyCount = keyCount x
-                         , degree = degree x
-                         , isLeaf = isLeaf x
-                         , keys = keys x
-                         , values = []
-                         , child =
-                               take i (child x) ++
-                               updatedChild : drop (i + 1) (child x)
-                         , next = next x
-                         }
+            x1 <- splitChild x i
+            let i1 = Helper.calcIndex i (k > (keys x1 !! i))
+            updatedChild <- insertNonFull (child x1 !! i1) k v
+            return
+                Node
+                { keyCount = keyCount x1
+                , degree = degree x1
+                , keys = keys x1
+                , child =
+                      take i1 (child x1) ++
+                      updatedChild : drop (i1 + 1) (child x1)
+                }
+        else do
+            updatedChild <- insertNonFull (child x !! i) k v
+            return
+                Node
+                { keyCount = keyCount x
+                , degree = degree x
+                , keys = keys x
+                , child =
+                      take i (child x) ++ updatedChild : drop (i + 1) (child x)
+                }
+insertNonFull x@Leaf {} k v = do
+    let i = Helper.insertIndex k (keys x) (keyCount x - 1)
+    let ret =
+            Leaf
+            { keyCount = keyCount x + 1
+            , degree = degree x
+            , keys = take i (keys x) ++ k : drop i (keys x)
+            , values = take i (values x) ++ v : drop i (values x)
+            , next = next x
+            }
+    leafName <- getLeafFile ret
+    syncNode leafName ret
+    return ret
+insertNonFull Nil _ _ = error "Cannot insert in Nil type"
