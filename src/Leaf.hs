@@ -6,14 +6,13 @@ import Types
 
 -- getLeafIndex returns the index of the leaf corresponding to the given key.
 -- The ith leaf can have a range of keys given by
--- [(2*m-1)*i, (2*m-1)*i + (m-1)], where m is the degree of the B+ Tree.
+--      [m*i, m*i + (m-1)], where m is the degree of the B+ Tree.
 getLeafIndex :: Int -> Int -> Int
 getLeafIndex k1 m1 = getLeafIndex' k1 m1 0
   where
     getLeafIndex' k m i
-        | k >= (2 * m - 1) * i && k <= (2 * m - 1) * i + m - 1 = i
-        | k >= (2 * m - 1) * i || k >= (2 * m - 1) * i + m - 1 =
-            getLeafIndex' k m (i + 1)
+        | k >= m * i && k <= (m * i) + m - 1 = i
+        | k > m * i && k > (m * i) + m - 1 = getLeafIndex' k m (i + 1)
         | otherwise = -1
 
 -- getLeafFile returns the filename of the leaf corresponding to the given key.
