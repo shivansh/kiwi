@@ -18,11 +18,20 @@ create d = do
               {keyCount = 0, degree = d, keys = [], values = [], next = Nothing}
         }
 
--- search returns the index of the key if it exists in BPlusTree and -1 otherwise.
-search :: Node a -> Int -> Int
-search x k
-    | i <= keyCount x && k == keys x !! i = 1
-    | otherwise = search (child x !! i) k
+-- search returns the index of the key if it exists in BPlusTree and -1
+-- otherwise.
+search :: Node a -> Int -> a
+search x k =
+    case x of
+        c@Node {}
+            | i == -1 -> search (child c !! relevantIndex 0 k (keys c)) k
+            | i <= keyCount c && k == keys c !! i -> search (child c !! i) k
+            | otherwise -> error "Key does not exist"
+        c@Leaf {}
+            | i == -1 -> error "Key does not exist"
+            | i <= keyCount c && k == keys c !! i -> values c !! i
+            | otherwise -> error "Key does not exist"
+        Nil -> error "Key does not exist"
   where
     i = Helper.findKey k (keys x)
 
@@ -38,17 +47,17 @@ splitChild x@Node {} i = do
         c@Node {} -> do
             let y =
                     Node
-                    { keyCount = degree x + 1
+                    { keyCount = degree x
                     , degree = degree x
-                    , keys = take (degree x + 1) (keys c)
-                    , child = take (degree x + 1) (child c)
+                    , keys = take (degree x) (keys c)
+                    , child = take (degree x) (child c)
                     }
             let z =
                     Node
-                    { keyCount = degree x - 2
+                    { keyCount = degree x - 1
                     , degree = degree x
-                    , keys = drop (degree x + 1) (keys c)
-                    , child = drop (degree x + 1) (child c)
+                    , keys = drop (degree x) (keys c)
+                    , child = drop (degree x) (child c)
                     }
             return
                 Node
@@ -63,18 +72,18 @@ splitChild x@Node {} i = do
             rightLeaf <- genLeafName
             let y =
                     Leaf
-                    { keyCount = degree x + 1
+                    { keyCount = degree x
                     , degree = degree x
-                    , keys = take (degree x + 1) (keys c)
-                    , values = take (degree x + 1) (values c)
+                    , keys = take (degree x) (keys c)
+                    , values = take (degree x) (values c)
                     , next = Just rightLeaf
                     }
             let z =
                     Leaf
-                    { keyCount = degree x - 2
+                    { keyCount = degree x - 1
                     , degree = degree x
-                    , keys = drop (degree x + 1) (keys c)
-                    , values = drop (degree x + 1) (values c)
+                    , keys = drop (degree x) (keys c)
+                    , values = drop (degree x) (values c)
                     , next = next c
                     }
             let ret =
@@ -89,6 +98,7 @@ splitChild x@Node {} i = do
             -- Sync updates to leaves on disk.
             leftLeaf <- getLeafFile y
             Disk.syncNode leftLeaf y
+            Disk.syncNode rightLeaf z
             -- The right leaf (z) doesn't need to be synced to disk as it is
             -- currently empty.
             return ret

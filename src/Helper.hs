@@ -7,6 +7,12 @@ import Data.Maybe
 findKey :: (Eq a) => a -> [a] -> Int
 findKey x xs = fromMaybe (-1) (elemIndex x xs)
 
+relevantIndex :: Int -> Int -> [Int] -> Int
+relevantIndex i _ [] = i - 1
+relevantIndex i y (x:xs)
+    | y < x = relevantIndex (i + 1) y xs
+    | otherwise = i - 1
+
 -- calcIndex determines the number of elements to be dropped when the creating
 -- right segment, depending on whether the node being splitted is a leaf or not.
 -- This property is also exploited when inserting in a non-full node.
