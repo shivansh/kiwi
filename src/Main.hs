@@ -12,9 +12,4 @@ main = do
     t4 <- BPlusTree.insert t3 4 "v4"
     t5 <- BPlusTree.insert t4 5 "v5"
     t6 <- BPlusTree.insert t5 6 "v6"
-    -- t7 <- BPlusTree.insert t6 7 "v7"
-    -- t8 <- BPlusTree.insert t7 8 "v8"
-    -- t9 <- BPlusTree.insert t8 9 "v9"
-    -- t10 <- BPlusTree.insert t9 10 "v10"
-    -- t11 <- BPlusTree.insert t10 11 "v11"
     print $ search (Types.root t6) 3
