@@ -24,8 +24,8 @@ func TestTree_Search(t *testing.T) {
 		wantErr bool
 	}{{
 		name:    "Test for a valid key",
-		args:    args{tree.Root, 0},
-		want:    []byte("abc"),
+		args:    args{tree.Root, 1},
+		want:    []byte("def"),
 		wantErr: false,
 	}, {
 		name:    "Test for an invalid key",

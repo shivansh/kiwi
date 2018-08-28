@@ -1,4 +1,5 @@
 // An implementation of in-memory operations supported by a B+ Tree.
+
 package bplustree
 
 import "fmt"
@@ -6,6 +7,7 @@ import "fmt"
 type Tree struct {
 	Root   *Node
 	dbPath string
+	index  map[int]int
 }
 
 type Node struct {
@@ -21,7 +23,7 @@ type Node struct {
 // Create creates a new B+ Tree of given degree.
 func Create(degree int, dbPath string) *Tree {
 	x := &Node{0, degree, true, []int{}, [][]byte{}, []*Node{}, nil}
-	return &Tree{x, dbPath}
+	return &Tree{x, dbPath, map[int]int{}}
 }
 
 func SplitChild(x *Node, i int) {
@@ -93,6 +95,7 @@ func InsertNonFull(x *Node, k int, v []byte) {
 	i := x.n - 1
 	if x.leaf {
 		// Values are inserted only at the leaves.
+		// TODO: Sync updates to disk.
 		x.keys, x.vals = append(x.keys, 0), append(x.vals, []byte{})
 		for ; i >= 0 && k < x.keys[i]; i-- {
 			x.keys[i+1], x.vals[i+1] = x.keys[i], x.vals[i]
@@ -141,7 +144,9 @@ func Traverse(x *Node, level int) {
 	}
 }
 
-// TraverseLeaves linearly traverses all the leaves starting from left.
+// TraverseLeaves linearly traverses all the leaves starting from left. This
+// kind of traversal gives the block representation of the data indexed by the
+// tree.
 func TraverseLeaves(x *Node) {
 	if x.leaf {
 		for k, v := range x.keys {
