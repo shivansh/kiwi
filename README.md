@@ -10,7 +10,7 @@ Made as a course project for Functional Programming (CS653).
 ```
 ├── ref ...................... Reference implementations
 │   ├── bplustree
-│   │   └── .................. B+ Tree implementation in Go
+│   │   └── .................. B+ Tree based persistent key-value store in Go
 │   └── btree
 │       └── .................. B Tree implementation in Haskell and Go
 └── src
@@ -21,8 +21,10 @@ Made as a course project for Functional Programming (CS653).
 From the project root, execute -
 
 ```shell
-cabal build
+cabal run
 ```
+
+This will configure the relevant dependencies and run the test file [Main.hs](src/Main.hs).
 
 ## Usage
 ```haskell

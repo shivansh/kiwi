@@ -4,13 +4,15 @@ import qualified Data.ByteString.Char8 as C
 import Disk
 import Helper
 import Leaf
+import System.Directory
 import Types
 
 -- create creates a new Tree of a given degree.
 create :: Int -> IO (Tree a)
 create d = do
     let newMetaData = MetaData 0
-    C.writeFile metaFile . C.pack . show $ newMetaData
+    createDirectory dbPath
+    syncMetaData newMetaData
     return
         Tree
         { root =

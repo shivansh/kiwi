@@ -31,5 +31,5 @@ genLeafName = do
     metaData <- Disk.readMetaData
     let leafName = "l" ++ show (1 + leafCount metaData)
     let newMetaData = MetaData $ 1 + leafCount metaData
-    C.writeFile metaFile . C.pack . show $ newMetaData
+    syncMetaData newMetaData
     return leafName
