@@ -3,9 +3,13 @@ module Disk where
 import qualified Data.ByteString.Char8 as C
 import Types
 
+-- The directory 'data' houses the files containing serialized leaf nodes.
 dbPath :: DBFile
 dbPath = "data/"
 
+-- metaFile contains the B+ Tree metadata, namely the current leaf count. This
+-- helps in allocating a unique filename for each leaf node in-line with the
+-- block index the leaf is located in.
 metaFile :: DBFile
 metaFile = "data/metadata"
 
